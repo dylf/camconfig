@@ -19,6 +19,7 @@ struct Controls {
     max: i64,
     step: u64,
     default: i64,
+    value: ControlValue,
     control_type: ControlType,
     menu_items: Option<Vec<(u32, MItem)>>,
 }
@@ -46,6 +47,18 @@ enum ControlType {
     Area,
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+enum ControlValue {
+    None,
+    Integer(i64),
+    Boolean(bool),
+    String(String),
+    CompoundU8(Vec<u8>),
+    CompoundU16(Vec<u16>),
+    CompoundU32(Vec<u32>),
+    CompoundPtr(Vec<u8>),
+}
+
 fn control_type_to_enum(typ: v4l::control::Type) -> ControlType {
     match typ {
         v4l::control::Type::Integer => ControlType::Integer,
@@ -68,6 +81,32 @@ fn menu_item_to_enum(item: &v4l::control::MenuItem) -> MItem {
     match item {
         v4l::control::MenuItem::Name(name) => MItem::Name(name.to_string()),
         v4l::control::MenuItem::Value(value) => MItem::Value(*value),
+    }
+}
+
+fn control_val_to_enum(val: &v4l::control::Value) -> ControlValue {
+    match val {
+        v4l::control::Value::None => ControlValue::None,
+        v4l::control::Value::Integer(value) => ControlValue::Integer(*value),
+        v4l::control::Value::Boolean(value) => ControlValue::Boolean(*value),
+        v4l::control::Value::String(value) => ControlValue::String(value.to_string()),
+        v4l::control::Value::CompoundU8(value) => ControlValue::CompoundU8(value.to_vec()),
+        v4l::control::Value::CompoundU16(value) => ControlValue::CompoundU16(value.to_vec()),
+        v4l::control::Value::CompoundU32(value) => ControlValue::CompoundU32(value.to_vec()),
+        v4l::control::Value::CompoundPtr(value) => ControlValue::CompoundPtr(value.to_vec()),
+    }
+}
+
+fn control_val_to_v4l(val: &ControlValue) -> v4l::control::Value {
+    match val {
+        ControlValue::None => v4l::control::Value::None,
+        ControlValue::Integer(value) => v4l::control::Value::Integer(*value),
+        ControlValue::Boolean(value) => v4l::control::Value::Boolean(*value),
+        ControlValue::String(value) => v4l::control::Value::String(value.to_string()),
+        ControlValue::CompoundU8(value) => v4l::control::Value::CompoundU8(value.to_vec()),
+        ControlValue::CompoundU16(value) => v4l::control::Value::CompoundU16(value.to_vec()),
+        ControlValue::CompoundU32(value) => v4l::control::Value::CompoundU32(value.to_vec()),
+        ControlValue::CompoundPtr(value) => v4l::control::Value::CompoundPtr(value.to_vec()),
     }
 }
 
@@ -100,27 +139,46 @@ fn get_device_controls(path: String) -> Result<Vec<Controls>, String> {
     let dev = Device::with_path(path).map_err(|e| format!("{}", e))?;
     let controls = dev.query_controls().map_err(|e| format!("{}", e))?;
 
-    Ok(controls
+    controls
         .iter()
-        .map(|c| Controls {
-            id: c.id,
-            name: c.name.clone(),
-            min: c.minimum,
-            max: c.maximum,
-            step: c.step,
-            default: c.default,
-            control_type: control_type_to_enum(c.typ),
-            menu_items: match &c.items {
-                Some(items) => Some(
-                    items
-                        .iter()
-                        .map(|(i, item)| (*i, menu_item_to_enum(item)))
-                        .collect::<Vec<(u32, MItem)>>(),
-                ),
-                None => None,
-            },
+        .map(|c| {
+            let control_val = match dev.control(c.id) {
+                Ok(ctrl) => control_val_to_enum(&ctrl.value),
+                Err(_) => ControlValue::None,
+            };
+
+            Ok(Controls {
+                id: c.id,
+                name: c.name.clone(),
+                min: c.minimum,
+                max: c.maximum,
+                step: c.step,
+                default: c.default,
+                value: control_val,
+                control_type: control_type_to_enum(c.typ),
+                menu_items: match &c.items {
+                    Some(items) => Some(
+                        items
+                            .iter()
+                            .map(|(i, item)| (*i, menu_item_to_enum(item)))
+                            .collect::<Vec<(u32, MItem)>>(),
+                    ),
+                    None => None,
+                },
+            })
         })
-        .collect::<Vec<Controls>>())
+        .collect::<Result<Vec<Controls>, String>>()
+}
+
+#[tauri::command]
+fn set_control_val(path: String, control_id: u32, value: ControlValue) -> Result<(), String> {
+    let dev = Device::with_path(path).map_err(|e| format!("{}", e))?;
+    let control = v4l::Control {
+        id: control_id,
+        value: control_val_to_v4l(&value),
+    };
+    dev.set_control(control).map_err(|e| format!("{}", e))?;
+    Ok(())
 }
 
 fn main() {
@@ -128,7 +186,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_device_capabilities,
             get_devices,
-            get_device_controls
+            get_device_controls,
+            set_control_val
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,5 +1,7 @@
 import { createSignal, onMount, For, Switch, Match } from "solid-js";
 import { invoke } from "@tauri-apps/api/tauri";
+import RangeControl from "./RangeControl";
+import BooleanControl from "./BooleanControl";
 
 type Device = {
   name: string;
@@ -14,7 +16,9 @@ type Controls = {
   max: number;
   step: number;
   default: number;
+  val: any;
   control_type: "Integer" | "Boolean" | "Menu" | "CtrlClass";
+  menu_items: [number, { Name: string; Value: number }][];
 };
 
 function App() {
@@ -79,27 +83,25 @@ function App() {
                 </label>
               </Match>
               <Match when={control.control_type === "Boolean"}>
-                <label>
-                  {control.name}
-                  <input
-                    class="form-checkbox rounded p-2 block"
-                    type="checkbox"
-                    name={control.name}
-                  />
-                </label>
+                <BooleanControl
+                  devicePath={selectedDevice() ?? ""}
+                  id={control.id}
+                  name={control.name}
+                  val={control.val}
+                  default_val={control.default}
+                />
               </Match>
               <Match when={control.control_type === "Integer"}>
-                <label>
-                  {control.name}
-                  <input
-                    type="range"
-                    class="form-range block"
-                    min={control.min}
-                    max={control.max}
-                    step={control.step}
-                    value={control.default}
-                  />
-                </label>
+                <RangeControl
+                  devicePath={selectedDevice() ?? ""}
+                  min={control.min}
+                  max={control.max}
+                  step={control.step}
+                  default_val={control.default}
+                  id={control.id}
+                  name={control.name}
+                  val={control.val}
+                />
               </Match>
             </Switch>
           </div>
