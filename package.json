@@ -12,6 +12,7 @@
   "license": "MIT",
   "dependencies": {
     "@tauri-apps/api": "^1.4.0",
+    "lucide-solid": "^0.258.0",
     "solid-js": "^1.7.0"
   },
   "devDependencies": {

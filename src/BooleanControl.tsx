@@ -10,7 +10,8 @@ type Props = {
 };
 
 function BooleanControl(props: Props): JSX.Element {
-  const { default_val, id, name, devicePath } = props;
+  const { default_val, id, name, devicePath, val } = props;
+  console.log(name, val);
 
   const [isChecked, setIsChecked] = createSignal(!!default_val);
 

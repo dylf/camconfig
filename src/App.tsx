@@ -1,5 +1,6 @@
 import { createSignal, onMount, For, Switch, Match } from "solid-js";
 import { invoke } from "@tauri-apps/api/tauri";
+import { Camera } from "lucide-solid";
 import RangeControl from "./RangeControl";
 import BooleanControl from "./BooleanControl";
 
@@ -16,7 +17,7 @@ type Controls = {
   max: number;
   step: number;
   default: number;
-  val: any;
+  value: any;
   control_type: "Integer" | "Boolean" | "Menu" | "CtrlClass";
   menu_items: [number, { Name: string; Value: number }][];
 };
@@ -31,10 +32,17 @@ function App() {
     setDevCapabilities(
       await invoke("get_device_capabilities", { path: selectedDevice() })
     );
-    setControls(
-      await invoke("get_device_controls", { path: selectedDevice() })
-    );
-    console.log(controls());
+    try {
+      const controls: Controls[] = await invoke("get_device_controls", {
+        path: selectedDevice(),
+      });
+      setControls(controls);
+    } catch (e) {
+      console.warn(e);
+      setControls([]);
+    } finally {
+      console.log(controls());
+    }
   }
 
   onMount(async () => {
@@ -44,9 +52,12 @@ function App() {
   });
 
   return (
-    <div class="bg-zinc-800 text-white">
+    <div class="">
       <div class="row">
-        <h1 class="text-3xl">Cam config</h1>
+        <h1 class="text-3xl">
+          Cam config
+          <Camera class="inline-block ml-2" color="white" size={36} />
+        </h1>
       </div>
       <select
         class="form-select bg-zinc-700 text-white"
@@ -62,6 +73,14 @@ function App() {
           )}
         </For>
       </select>
+      <button
+        type="submit"
+        class="bg-zinc-700 rounded-md p-4 my-2 hover:bg-zinc-900"
+        onClick={() => selectDevice()}
+      >
+        Get Device Capabilities
+      </button>
+      <p>{devCapabilities()}</p>
 
       <For each={controls()}>
         {(control) => (
@@ -87,7 +106,7 @@ function App() {
                   devicePath={selectedDevice() ?? ""}
                   id={control.id}
                   name={control.name}
-                  val={control.val}
+                  val={control.value}
                   default_val={control.default}
                 />
               </Match>
@@ -100,28 +119,13 @@ function App() {
                   default_val={control.default}
                   id={control.id}
                   name={control.name}
-                  val={control.val}
+                  val={control.value}
                 />
               </Match>
             </Switch>
           </div>
         )}
       </For>
-      <form
-        class="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          selectDevice();
-        }}
-      >
-        <button
-          type="submit"
-          class="bg-zinc-700 rounded-md p-4 my-2 hover:bg-zinc-900"
-        >
-          Get Device Capabilities
-        </button>
-      </form>
-      <p>{devCapabilities()}</p>
     </div>
   );
 }
