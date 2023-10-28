@@ -10,7 +10,7 @@ type Device = {
   index: number;
 };
 
-type Controls = {
+type Control = {
   id: number;
   name: string;
   min: number;
@@ -22,10 +22,32 @@ type Controls = {
   menu_items: [number, { Name: string; Value: number }][];
 };
 
+type ControlGroup = {
+  id: number;
+  name: string;
+  controls: Control[];
+};
+
+type DeviceControls = Array<ControlGroup | Control>;
+type DeviceControlsResponse = Array<
+  | {
+      Control: Control;
+      ControlGroup: never;
+    }
+  | { ControlGroup: ControlGroup; Control: never }
+>;
+
+function isControlGroup(
+  control: ControlGroup | Control
+): control is ControlGroup {
+  console.log(Object.keys(control));
+  return (control as ControlGroup).controls !== undefined;
+}
+
 function App() {
   const [devCapabilities, setDevCapabilities] = createSignal("");
   const [devices, setDevices] = createSignal<Device[]>([]);
-  const [controls, setControls] = createSignal<Controls[]>([]);
+  const [controls, setControls] = createSignal<DeviceControls>([]);
   const [selectedDevice, setSelectedDevice] = createSignal<string>();
 
   async function selectDevice() {
@@ -33,10 +55,13 @@ function App() {
       await invoke("get_device_capabilities", { path: selectedDevice() })
     );
     try {
-      const controls: Controls[] = await invoke("get_device_controls", {
-        path: selectedDevice(),
-      });
-      setControls(controls);
+      const controls: DeviceControlsResponse = await invoke(
+        "get_device_controls",
+        {
+          path: selectedDevice(),
+        }
+      );
+      setControls(controls.map((c) => c.Control || c.ControlGroup));
     } catch (e) {
       console.warn(e);
       setControls([]);
@@ -53,7 +78,7 @@ function App() {
 
   return (
     <div class="">
-      <div class="row">
+      <div class="row p-2">
         <h1 class="text-3xl">
           Cam config
           <Camera class="inline-block ml-2" color="white" size={36} />
@@ -83,49 +108,82 @@ function App() {
       <p>{devCapabilities()}</p>
 
       <For each={controls()}>
+        {(control) => {
+          if (isControlGroup(control)) {
+            return (
+              <ControlGroup
+                controlGroup={control}
+                selectedDevice={selectedDevice}
+              />
+            );
+          } else {
+            console.log(control);
+          }
+        }}
+      </For>
+    </div>
+  );
+}
+
+type Props = {
+  controlGroup: ControlGroup;
+  selectedDevice: () => string | undefined;
+};
+
+function ControlGroup({ controlGroup, selectedDevice }: Props) {
+  return (
+    <div class="block mb-2">
+      <div class="text-xl">{controlGroup.name}</div>
+      <For each={controlGroup.controls}>
         {(control) => (
-          <div class="block mb-2">
-            <Switch fallback={<div>Unknown control</div>}>
-              <Match when={control.control_type === "CtrlClass"}>
-                <div class="text-xl">{control.name}</div>
-              </Match>
-              <Match when={control.control_type === "Menu"}>
-                <label>
-                  {control.name}
-                  <select class="form-select block bg-zinc-700">
-                    <For each={control.menu_items}>
-                      {(item) => (
-                        <option value={item[0]}>{item[1].Name}</option>
-                      )}
-                    </For>
-                  </select>
-                </label>
-              </Match>
-              <Match when={control.control_type === "Boolean"}>
-                <BooleanControl
-                  devicePath={selectedDevice() ?? ""}
-                  id={control.id}
-                  name={control.name}
-                  val={control.value}
-                  default_val={control.default}
-                />
-              </Match>
-              <Match when={control.control_type === "Integer"}>
-                <RangeControl
-                  devicePath={selectedDevice() ?? ""}
-                  min={control.min}
-                  max={control.max}
-                  step={control.step}
-                  default_val={control.default}
-                  id={control.id}
-                  name={control.name}
-                  val={control.value}
-                />
-              </Match>
-            </Switch>
-          </div>
+          <Control control={control} selectedDevice={selectedDevice} />
         )}
       </For>
+    </div>
+  );
+}
+
+type CProps = {
+  control: Control;
+  selectedDevice: () => string | undefined;
+};
+
+function Control({ control, selectedDevice }: CProps) {
+  return (
+    <div class="block mb-2">
+      <Switch fallback={<div>Unknown control</div>}>
+        <Match when={control.control_type === "Menu"}>
+          <label>
+            {control.name}
+            <select class="form-select block bg-zinc-700">
+              <For each={control.menu_items}>
+                {(item) => <option value={item[0]}>{item[1].Name}</option>}
+              </For>
+            </select>
+          </label>
+        </Match>
+        <Match when={control.control_type === "Boolean"}>
+          <BooleanControl
+            devicePath={selectedDevice() ?? ""}
+            id={control.id}
+            name={control.name}
+            val={control.value}
+            default_val={control.default}
+          />
+        </Match>
+        <Match when={control.control_type === "Integer"}>
+          <RangeControl
+            devicePath={selectedDevice() ?? ""}
+            min={control.min}
+            max={control.max}
+            step={control.step}
+            default_val={control.default}
+            id={control.id}
+            name={control.name}
+            val={control.value}
+          />
+        </Match>
+      </Switch>
     </div>
   );
 }

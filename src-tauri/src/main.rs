@@ -12,7 +12,7 @@ struct VideoDevice {
 }
 
 #[derive(Debug, serde::Serialize)]
-struct Controls {
+struct Control {
     id: u32,
     name: String,
     min: i64,
@@ -22,6 +22,19 @@ struct Controls {
     value: ControlValue,
     control_type: ControlType,
     menu_items: Option<Vec<(u32, MItem)>>,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct ControlGroup {
+    id: u32,
+    name: String,
+    controls: Vec<Control>,
+}
+
+#[derive(Debug, serde::Serialize)]
+enum DeviceControls {
+    ControlGroup(ControlGroup),
+    Control(Control),
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -135,39 +148,54 @@ fn get_device_capabilities(path: String) -> String {
 }
 
 #[tauri::command]
-fn get_device_controls(path: String) -> Result<Vec<Controls>, String> {
+fn get_device_controls(path: String) -> Result<Vec<DeviceControls>, String> {
     let dev = Device::with_path(path).map_err(|e| format!("{}", e))?;
     let controls = dev.query_controls().map_err(|e| format!("{}", e))?;
+    let mut device_controls: Vec<DeviceControls> = Vec::new();
 
-    controls
-        .iter()
-        .map(|c| {
-            let control_val = match dev.control(c.id) {
-                Ok(ctrl) => control_val_to_enum(&ctrl.value),
-                Err(_) => ControlValue::None,
-            };
-
-            Ok(Controls {
-                id: c.id,
-                name: c.name.clone(),
-                min: c.minimum,
-                max: c.maximum,
-                step: c.step,
-                default: c.default,
-                value: control_val,
-                control_type: control_type_to_enum(c.typ),
-                menu_items: match &c.items {
-                    Some(items) => Some(
-                        items
-                            .iter()
-                            .map(|(i, item)| (*i, menu_item_to_enum(item)))
-                            .collect::<Vec<(u32, MItem)>>(),
-                    ),
-                    None => None,
-                },
-            })
-        })
-        .collect::<Result<Vec<Controls>, String>>()
+    for ctrl in controls {
+        match control_type_to_enum(ctrl.typ) {
+            ControlType::CtrlClass => {
+                device_controls.push(DeviceControls::ControlGroup(ControlGroup {
+                    id: ctrl.id,
+                    name: ctrl.name,
+                    controls: Vec::new(),
+                }));
+            }
+            ctrl_type => {
+                let ctrl_val = match dev.control(ctrl.id) {
+                    Ok(ctrl) => control_val_to_enum(&ctrl.value),
+                    Err(_) => ControlValue::None,
+                };
+                let current_ctrl = Control {
+                    id: ctrl.id,
+                    name: ctrl.name.clone(),
+                    min: ctrl.minimum,
+                    max: ctrl.maximum,
+                    step: ctrl.step,
+                    default: ctrl.default,
+                    value: ctrl_val,
+                    control_type: ctrl_type,
+                    menu_items: match &ctrl.items {
+                        Some(items) => Some(
+                            items
+                                .iter()
+                                .map(|(i, item)| (*i, menu_item_to_enum(item)))
+                                .collect::<Vec<(u32, MItem)>>(),
+                        ),
+                        None => None,
+                    },
+                };
+                match device_controls.last_mut() {
+                    Some(DeviceControls::ControlGroup(ControlGroup { controls, .. })) => {
+                        controls.push(current_ctrl)
+                    }
+                    _ => device_controls.push(DeviceControls::Control(current_ctrl)),
+                }
+            }
+        }
+    }
+    Ok(device_controls)
 }
 
 #[tauri::command]
