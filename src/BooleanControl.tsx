@@ -29,7 +29,7 @@ function BooleanControl(props: Props): JSX.Element {
     <label>
       {name}
       <input
-        class="form-checkbox rounded p-2 block"
+        class="form-checkbox rounded p-2 block w-100"
         type="checkbox"
         name={name}
         onChange={handleChange}

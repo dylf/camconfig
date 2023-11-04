@@ -50,6 +50,12 @@ function App() {
   const [controls, setControls] = createSignal<DeviceControls>([]);
   const [selectedDevice, setSelectedDevice] = createSignal<string>();
 
+  const handleDeviceChange = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    setSelectedDevice(target.value);
+    selectDevice();
+  };
+
   async function selectDevice() {
     setDevCapabilities(
       await invoke("get_device_capabilities", { path: selectedDevice() })
@@ -74,53 +80,57 @@ function App() {
     setDevices(await invoke("get_devices"));
     setControls(await invoke("get_device_controls", { path: "/dev/video0" }));
     setSelectedDevice(devices()[0].path);
+    selectDevice();
   });
 
   return (
-    <div class="">
-      <div class="row p-2">
+    <div class="flex flex-col">
+      <div class="flex-row p-2 border-zinc-800 border-solid border-b">
         <h1 class="text-3xl">
           Cam config
           <Camera class="inline-block ml-2" color="white" size={36} />
         </h1>
       </div>
-      <select
-        class="form-select bg-zinc-700 text-white"
-        name="device"
-        id="device-select"
-        onChange={(e) => setSelectedDevice(e.target.value)}
-      >
-        <For each={devices()}>
-          {(device) => (
-            <option
-              value={device.path}
-            >{`${device.index} ${device.name} (${device.path})`}</option>
-          )}
-        </For>
-      </select>
-      <button
-        type="submit"
-        class="bg-zinc-700 rounded-md p-4 my-2 hover:bg-zinc-900"
-        onClick={() => selectDevice()}
-      >
-        Get Device Capabilities
-      </button>
-      <p>{devCapabilities()}</p>
-
-      <For each={controls()}>
-        {(control) => {
-          if (isControlGroup(control)) {
-            return (
-              <ControlGroup
-                controlGroup={control}
-                selectedDevice={selectedDevice}
-              />
-            );
-          } else {
-            console.log(control);
-          }
-        }}
-      </For>
+      <div class="flex-row p-2 border-zinc-800 border-solid border-b">
+        <label for="device" class="mr-2">
+          Video Device
+        </label>
+        <select
+          class="form-select bg-black text-white rounded-lg"
+          name="device"
+          id="device-select"
+          onChange={handleDeviceChange}
+        >
+          <For each={devices()}>
+            {(device) => (
+              <option
+                value={device.path}
+              >{`${device.name} (${device.path})`}</option>
+            )}
+          </For>
+        </select>
+      </div>
+      <div class="flex flex-row p-2 flex-grow h-full">
+        <div class="flex-col w-1/2 border-zinc-800 border-r border-solid h-full flex-grow ">
+          <For each={controls()}>
+            {(control) => {
+              if (isControlGroup(control)) {
+                return (
+                  <ControlGroup
+                    controlGroup={control}
+                    selectedDevice={selectedDevice}
+                  />
+                );
+              } else {
+                console.log(control);
+              }
+            }}
+          </For>
+        </div>
+        <div class="col p-8">
+          <p>{devCapabilities()}</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -132,8 +142,8 @@ type Props = {
 
 function ControlGroup({ controlGroup, selectedDevice }: Props) {
   return (
-    <div class="block mb-2">
-      <div class="text-xl">{controlGroup.name}</div>
+    <div class="block mb-4 w-100">
+      <div class="text-xl mb-2">{controlGroup.name}</div>
       <For each={controlGroup.controls}>
         {(control) => (
           <Control control={control} selectedDevice={selectedDevice} />
@@ -155,7 +165,7 @@ function Control({ control, selectedDevice }: CProps) {
         <Match when={control.control_type === "Menu"}>
           <label>
             {control.name}
-            <select class="form-select block bg-zinc-700">
+            <select class="form-select block bg-black rounded-lg text-white">
               <For each={control.menu_items}>
                 {(item) => <option value={item[0]}>{item[1].Name}</option>}
               </For>
