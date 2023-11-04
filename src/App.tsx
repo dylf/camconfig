@@ -1,47 +1,26 @@
-import { createSignal, onMount, For, Switch, Match } from "solid-js";
+import { createSignal, onMount, For } from "solid-js";
 import { invoke } from "@tauri-apps/api/tauri";
 import { Camera } from "lucide-solid";
-import RangeControl from "./RangeControl";
-import BooleanControl from "./BooleanControl";
+import { Col, Grid } from "@/components/ui/grid";
+import { Separator } from "@/components/ui/seperator";
+import { DeviceControl, DeviceControlGroup, Device } from "@/types";
+import { DeviceSelector } from "@/components/device-selector";
+import { ControlGroup } from "@/components/control-group";
 
-type Device = {
-  name: string;
-  path: string;
-  index: number;
-};
-
-type Control = {
-  id: number;
-  name: string;
-  min: number;
-  max: number;
-  step: number;
-  default: number;
-  value: any;
-  control_type: "Integer" | "Boolean" | "Menu" | "CtrlClass";
-  menu_items: [number, { Name: string; Value: number }][];
-};
-
-type ControlGroup = {
-  id: number;
-  name: string;
-  controls: Control[];
-};
-
-type DeviceControls = Array<ControlGroup | Control>;
+type DeviceControls = Array<DeviceControlGroup | DeviceControl>;
 type DeviceControlsResponse = Array<
   | {
-      Control: Control;
+      Control: DeviceControl;
       ControlGroup: never;
     }
-  | { ControlGroup: ControlGroup; Control: never }
+  | { ControlGroup: DeviceControlGroup; Control: never }
 >;
 
 function isControlGroup(
-  control: ControlGroup | Control
-): control is ControlGroup {
+  control: DeviceControlGroup | DeviceControl
+): control is DeviceControlGroup {
   console.log(Object.keys(control));
-  return (control as ControlGroup).controls !== undefined;
+  return (control as DeviceControlGroup).controls !== undefined;
 }
 
 function App() {
@@ -77,114 +56,43 @@ function App() {
   });
 
   return (
-    <div class="">
-      <div class="row p-2">
-        <h1 class="text-3xl">
-          Cam config
-          <Camera class="inline-block ml-2" color="white" size={36} />
-        </h1>
-      </div>
-      <select
-        class="form-select bg-zinc-700 text-white"
-        name="device"
-        id="device-select"
-        onChange={(e) => setSelectedDevice(e.target.value)}
-      >
-        <For each={devices()}>
-          {(device) => (
-            <option
-              value={device.path}
-            >{`${device.index} ${device.name} (${device.path})`}</option>
-          )}
-        </For>
-      </select>
-      <button
-        type="submit"
-        class="bg-zinc-700 rounded-md p-4 my-2 hover:bg-zinc-900"
-        onClick={() => selectDevice()}
-      >
-        Get Device Capabilities
-      </button>
-      <p>{devCapabilities()}</p>
-
-      <For each={controls()}>
-        {(control) => {
-          if (isControlGroup(control)) {
-            return (
-              <ControlGroup
-                controlGroup={control}
-                selectedDevice={selectedDevice}
-              />
-            );
-          } else {
-            console.log(control);
-          }
-        }}
-      </For>
-    </div>
-  );
-}
-
-type Props = {
-  controlGroup: ControlGroup;
-  selectedDevice: () => string | undefined;
-};
-
-function ControlGroup({ controlGroup, selectedDevice }: Props) {
-  return (
-    <div class="block mb-2">
-      <div class="text-xl">{controlGroup.name}</div>
-      <For each={controlGroup.controls}>
-        {(control) => (
-          <Control control={control} selectedDevice={selectedDevice} />
-        )}
-      </For>
-    </div>
-  );
-}
-
-type CProps = {
-  control: Control;
-  selectedDevice: () => string | undefined;
-};
-
-function Control({ control, selectedDevice }: CProps) {
-  return (
-    <div class="block mb-2">
-      <Switch fallback={<div>Unknown control</div>}>
-        <Match when={control.control_type === "Menu"}>
-          <label>
-            {control.name}
-            <select class="form-select block bg-zinc-700">
-              <For each={control.menu_items}>
-                {(item) => <option value={item[0]}>{item[1].Name}</option>}
-              </For>
-            </select>
-          </label>
-        </Match>
-        <Match when={control.control_type === "Boolean"}>
-          <BooleanControl
-            devicePath={selectedDevice() ?? ""}
-            id={control.id}
-            name={control.name}
-            val={control.value}
-            default_val={control.default}
-          />
-        </Match>
-        <Match when={control.control_type === "Integer"}>
-          <RangeControl
-            devicePath={selectedDevice() ?? ""}
-            min={control.min}
-            max={control.max}
-            step={control.step}
-            default_val={control.default}
-            id={control.id}
-            name={control.name}
-            val={control.value}
-          />
-        </Match>
-      </Switch>
-    </div>
+    <Grid cols={1} class="p-2">
+      <Col>
+        <div class="row p-2">
+          <h1 class="text-3xl">
+            Cam config
+            <Camera class="inline-block ml-2" color="white" size={36} />
+          </h1>
+        </div>
+        <Separator />
+        <DeviceSelector
+          devices={devices()}
+          selectDevice={selectDevice}
+          setSelectedDevice={setSelectedDevice}
+        />
+      </Col>
+      <Grid cols={1} colsMd={3}>
+        <Col span={1} class="p-2">
+          <For each={controls()}>
+            {(control) => {
+              if (isControlGroup(control)) {
+                return (
+                  <ControlGroup
+                    controlGroup={control}
+                    selectedDevice={selectedDevice}
+                  />
+                );
+              } else {
+                console.log(control);
+              }
+            }}
+          </For>
+        </Col>
+        <Col span={1} spanMd={2}>
+          <p>{devCapabilities()}</p>
+        </Col>
+      </Grid>
+    </Grid>
   );
 }
 
