@@ -52,11 +52,13 @@ function RangeControl(props: Props): JSX.Element {
         onChange={handleChange}
       />
       <span class="ml-2">{value()}</span>
-      <span class="ml-4 italic">(default {default_val})</span>
       {value() !== default_val ? (
-        <button onClick={resetValue}>
-          <RotateCcw class="inline-block ml-2" size={16} />
-        </button>
+        <>
+          <button onClick={resetValue}>
+            <RotateCcw class="inline-block ml-2" size={16} />
+          </button>
+          <span class="ml-4 italic">(default {default_val})</span>
+        </>
       ) : null}
     </label>
   );

@@ -27,14 +27,14 @@ function BooleanControl(props: Props): JSX.Element {
 
   return (
     <label>
-      {name}
       <input
-        class="form-checkbox rounded p-2 block w-100"
+        class="form-checkbox rounded p-2 block w-100 inline-block"
         type="checkbox"
         name={name}
         onChange={handleChange}
         checked={isChecked()}
       />
+      <span class="px-2">{name}</span>
     </label>
   );
 }
