@@ -1,6 +1,14 @@
-import { createSignal, onMount, For } from "solid-js";
+import {
+  createSignal,
+  onMount,
+  For,
+  Accessor,
+  Setter,
+  Switch,
+  Match,
+} from "solid-js";
 import { invoke } from "@tauri-apps/api/tauri";
-import { Camera } from "lucide-solid";
+import { Camera, Settings, SlidersHorizontal } from "lucide-solid";
 import { ControlForm } from "./ControlForm";
 
 type Device = {
@@ -36,18 +44,69 @@ type DeviceControlsResponse = Array<
   | { ControlGroup: ControlGroup; Control: never }
 >;
 
-function App() {
-  const [devCapabilities, setDevCapabilities] = createSignal("");
-  const [devices, setDevices] = createSignal<Device[]>([]);
-  const [controls, setControls] = createSignal<DeviceControls>([]);
-  const [selectedDevice, setSelectedDevice] = createSignal<string>();
+type AppState = "Settings" | "Controls";
 
-  const handleDeviceChange = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    setSelectedDevice(target.value);
-    selectDevice();
+const [devCapabilities, setDevCapabilities] = createSignal("");
+const [devices, setDevices] = createSignal<Device[]>([]);
+const [controls, setControls] = createSignal<DeviceControls>([]);
+const [selectedDevice, setSelectedDevice] = createSignal<string>();
+const [appState, setAppState] = createSignal<AppState>("Controls");
+
+function App() {
+  return (
+    <div class="flex flex-col h-screen">
+      <TopBar />
+      <Switch>
+        <Match when={appState() === "Controls"}>
+          <DeviceForm></DeviceForm>
+        </Match>
+        <Match when={appState() === "Settings"}>
+          <SettingsForm />
+        </Match>
+      </Switch>
+    </div>
+  );
+}
+
+const TopBar = () => {
+  const toggleAppState = (e: Event) => {
+    e.preventDefault();
+    setAppState(appState() === "Controls" ? "Settings" : "Controls");
   };
 
+  return (
+    <div class="px-6 py-3 flex-row border-zinc-800 border-solid border-b w-full">
+      <div class="flex">
+        <h1 class="flex-col text-3xl py-2">
+          Cam Config
+          <Camera class="inline-block ml-2" color="white" size={36} />
+        </h1>
+        <div class="flex-col ml-auto">
+          <button
+            class="hover:bg-zinc-900 p-2 rounded-xl"
+            title={appState() === "Settings" ? "Controls" : "Settings"}
+            onClick={toggleAppState}
+          >
+            <Switch>
+              <Match when={appState() === "Settings"}>
+                <SlidersHorizontal
+                  class="inline-block"
+                  color="white"
+                  size={32}
+                />
+              </Match>
+              <Match when={appState() === "Controls"}>
+                <Settings class="inline-block" color="white" size={32} />
+              </Match>
+            </Switch>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DeviceForm = () => {
   async function selectDevice() {
     setDevCapabilities(
       await invoke("get_device_capabilities", { path: selectedDevice() }),
@@ -63,26 +122,24 @@ function App() {
     } catch (e) {
       console.warn(e);
       setControls([]);
-    } finally {
-      console.log(controls());
     }
   }
 
   onMount(async () => {
-    setDevices(await invoke("get_devices"));
-    setControls(await invoke("get_device_controls", { path: "/dev/video0" }));
-    setSelectedDevice(devices()[0].path);
-    selectDevice();
+    if (!selectedDevice()) {
+      setDevices(await invoke("get_devices"));
+      setControls(await invoke("get_device_controls", { path: "/dev/video0" }));
+      setSelectedDevice(devices()[0].path);
+      selectDevice();
+    }
   });
-
+  const handleDeviceChange = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    setSelectedDevice(target.value);
+    selectDevice();
+  };
   return (
-    <div class="flex flex-col">
-      <div class="px-6 py-3 flex-row border-zinc-800 border-solid border-b">
-        <h1 class="text-3xl">
-          Cam config
-          <Camera class="inline-block ml-2" color="white" size={36} />
-        </h1>
-      </div>
+    <>
       <div class="px-6 py-3 flex-row border-zinc-800 border-solid border-b">
         <label for="device" class="mr-2">
           Device
@@ -102,7 +159,7 @@ function App() {
           </For>
         </select>
       </div>
-      <div class="flex flex-row flex-grow h-full">
+      <div class="items-stretch flex flex-row flex-grow">
         <div class="px-6 py-3 flex-col w-4/6 border-zinc-800 border-r border-solid h-full flex-grow ">
           <ControlForm controls={controls} selectedDevice={selectedDevice} />
         </div>
@@ -111,8 +168,14 @@ function App() {
           <p>{devCapabilities()}</p>
         </div>
       </div>
-    </div>
+    </>
   );
-}
+};
+
+const SettingsForm = () => {
+  return (
+    <div class="flex-grow flex flex-col p-8 text-xl">Nothing to see here</div>
+  );
+};
 
 export default App;
