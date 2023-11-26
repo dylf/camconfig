@@ -1,6 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod db;
+
+use db::init_db;
 use v4l::context;
 use v4l::prelude::*;
 
@@ -217,6 +220,11 @@ fn main() {
             get_device_controls,
             set_control_val
         ])
+        .setup(|app| {
+            let handle = app.handle();
+            tauri::async_runtime::spawn(async move { init_db(&handle).await });
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
